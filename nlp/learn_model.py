@@ -5,12 +5,12 @@ import torch.nn as nn
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 from collections import Counter
-from model_construction import LSTM_architecture
+from .model_construction import LSTM_architecture
 import pickle
 
 ### Считывание данных
 n = ['text']
-data_positive_current = pd.read_csv('combined_output_positive.csv', sep=';', names=n, usecols=['text'])
+data_positive_current = pd.read_csv('nlp/combined_output_positive.csv', sep=';', names=n, usecols=['text'])
 total_rows = len(data_positive_current)
 sample_size = total_rows // 2
 reduced_data = data_positive_current.sample(n=sample_size, random_state=42)  # random_state для воспроизводимости
