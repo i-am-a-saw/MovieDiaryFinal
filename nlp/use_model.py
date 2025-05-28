@@ -5,72 +5,22 @@ from math import ceil
 import torch
 from sklearn.utils import shuffle
 from .model_construction import LSTM_architecture
+import pickle
 
-
-def read_data():
-    n = ['text']
-    data_positive_current = pd.read_csv('nlp/combined_output_positive.csv', sep=';', names=n, usecols=['text'])
-    total_rows = len(data_positive_current)
-    sample_size = total_rows // 2
-    reduced_data = data_positive_current.sample(n=sample_size, random_state=42)  # random_state для воспроизводимости
-    reduced_data.to_csv('combined_output_positive_double.csv', sep=';', index=False, header=False)
-    data_positive_current= pd.read_csv('combined_output_positive_double.csv', sep=';', names=n, usecols=['text'])
-
-
-    data_positive_new = pd.read_csv('new_positive_reviews.csv', sep=';', names=n, usecols=['text'])
-    data_positive = pd.concat([data_positive_current, data_positive_new], ignore_index=True)
-
-    data_negative_current = pd.read_csv('combined_output_negative.csv', sep=';', names=n, usecols=['text'])
-    data_negative_new = pd.read_csv('new_negative_reviews.csv', sep=';', names=n, usecols=['text'])
-    data_negative = pd.concat([data_negative_current, data_negative_new], ignore_index=True)
-
-    ### Формирование сбалансированного датасета
-    sample_size = 40000
-    reviews_withoutshuffle = np.concatenate((data_positive['text'].values[:sample_size],
-                                             data_negative['text'].values[:sample_size]), axis=0)
-    labels_withoutshuffle = np.asarray([1] * sample_size + [0] * sample_size)
-
-    assert len(reviews_withoutshuffle) == len(labels_withoutshuffle)
-    texts, labels = shuffle(reviews_withoutshuffle, labels_withoutshuffle, random_state=0)
-
-    return  texts, labels
-
-texts, labels = read_data()
-
-#'"#$%&\'()*+-/:;<=>[\]^_`{|}~'
-
-def tokenize():
-    punctuation = '"#$%&\'()*+-/:;<=>[\]^_`{|}~'
-    all_texts = 'separator'.join(texts)
-    all_texts = all_texts.lower()
-    all_text = ''.join([c for c in all_texts if c not in punctuation])
-    texts_split = all_text.split('separator')
-    all_text = ' '.join(texts_split)
-    words = all_text.split()
-    return words
-
-
-def get_vocabulary():
-    words = tokenize()
-    counts = Counter(words)
-    vocab = sorted(counts, key=counts.get, reverse=True)
-    vocab_to_int = {word: ii for ii, word in enumerate(vocab, 1)}
-    return vocab, vocab_to_int
-
+with open('vocab_to_int.pkl', 'rb') as f:
+    vocab_to_int = pickle.load(f)
+vocab = list(vocab_to_int.keys())
 
 def tokenize_text(test_review):
     test_review = test_review.lower()
-    punctuation = '"#$%&\'()*+-/:;<=>[\]^_`{|}~'
-    test_text = ''.join([c for c in test_review if c not in punctuation])
+    punctuation_to_remove = '"#$%&\'()*+-/:;<=>[\]^_`{|}~'  # Удаляем всё, кроме !, ?, .
+    test_text = ''.join([c for c in test_review if c not in punctuation_to_remove])
     test_words = test_text.split()
-
     new_text = []
     for word in test_words:
-        if (word[0] != '@') & ('http' not in word) & (~word.isdigit()):
+        if (word[0] != '@') and ('http' not in word) and (not word.isdigit()):
             new_text.append(word)
-    test_ints = []
-    test_ints.append([vocab_to_int[word] for word in new_text])
-
+    test_ints = [[vocab_to_int.get(word, 0) for word in new_text]]  # Используем .get() для обработки неизвестных слов
     return test_ints
 
 
@@ -85,7 +35,7 @@ def add_pads(texts_ints, seq_length):
     return features
 
 
-def predict(net, test_text, sequence_length=30):
+def predict(net, test_text, sequence_length=25):
     net.eval()
     test_ints = tokenize_text(test_text)
     seq_length = sequence_length
@@ -110,7 +60,6 @@ def predict(net, test_text, sequence_length=30):
 def scan(string):
 
     input_text = string
-    _, vocab_to_int = get_vocabulary()
 
 
     vocab_size = len(vocab_to_int)+1
@@ -136,48 +85,28 @@ def scan(string):
         return "Рекомендую"
 
 if __name__ == "__main__":
-    _, vocab_to_int = get_vocabulary()
     vocab_size = len(vocab_to_int) + 1
     output_size = 1
-    embedding_dim = 200
+    embedding_dim = 100
     hidden_dim = 128
     number_of_layers = 2
     model = LSTM_architecture(vocab_size, output_size, embedding_dim, hidden_dim, number_of_layers)
-    model.load_state_dict(torch.load("best_model.pt", map_location=torch.device('cpu')))
-    seq_length = 30
+    model.load_state_dict(torch.load("model_check_last_new.pt", map_location=torch.device('cpu')))
+    seq_length = 25
 
-    test_review1 = "не понравилось"
-    test_review2 = "Фильм ужасен! Никогда больше не буду смотреть!"
-    test_review3 = "Нормальный фильм. Ничего особенного"
-    test_review4 = "Крутой"
-    test_review5 = "Не крутой"
-    test_review6 = "Понравился"
-    test_review7 = "Не понравился"
-    test_review8 = "Рекомендую"
+    test_review1 = "развязка интересная, режиссер постарался"
+
 
     print(f"Модель на устройстве: {next(model.parameters()).device}")
     type_of_tonal1, _ = predict(model, test_review1, seq_length)
     print("Окраска - {}".format(type_of_tonal1))
-    type_of_tonal2, _ = predict(model, test_review2, seq_length)
-    print("Окраска - {}".format(type_of_tonal1))
-    type_of_tonal3, _ = predict(model, test_review3, seq_length)
-    print("Окраска - {}".format(type_of_tonal1))
-    type_of_tonal4, _ = predict(model, test_review4, seq_length)
-    print("Окраска - {}".format(type_of_tonal1))
-    type_of_tonal5, _ = predict(model, test_review5, seq_length)
-    print("Окраска - {}".format(type_of_tonal1))
-    type_of_tonal6, _ = predict(model, test_review6, seq_length)
-    print("Окраска - {}".format(type_of_tonal1))
-    type_of_tonal7, _ = predict(model, test_review7, seq_length)
-    print("Окраска - {}".format(type_of_tonal1))
-    type_of_tonal8, _ = predict(model, test_review8, seq_length)
-    print("Окраска - {}".format(type_of_tonal1))
+
 #Vocab size: 345796
 # Негативное сообщение
 # Позитивное сообщение
 # Негативное сообщение
 # Позитивное сообщение
-# Негативное сообщение
+# Позитивное сообщение
 # Позитивное сообщение
 # Позитивное сообщение
 # Позитивное сообщение
