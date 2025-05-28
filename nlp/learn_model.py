@@ -86,7 +86,7 @@ def add_pads(reviews_ints, seq_length):
 
 ### Разделение на обучающую, валидационную и тестовую выборки
 
-features = add_pads(reviews_ints, seq_length=20)
+features = add_pads(reviews_ints, seq_length = 25)
 split_frac = 0.8  # 80% на обучающую выборку
 
 split_idx = int(len(features) * split_frac)
@@ -114,7 +114,7 @@ train_gpu = torch.cuda.is_available()
 
 vocab_size = len(vocab_to_int) + 1
 output_size = 1
-embedding_dim = 200
+embedding_dim = 100
 hidden_dim = 128
 n_layers = 2
 model = LSTM_architecture(vocab_size, output_size, embedding_dim, hidden_dim, n_layers)
@@ -123,7 +123,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
 ### Обучение модели
 
-epochs = 10  # оптимальное количество эпох для того, чтобы модель достаточно обучилась, но не переобучилась
+epochs = 4  # оптимальное количество эпох для того, чтобы модель достаточно обучилась, но не переобучилась
 counter = 0
 batch_num = 100
 clip = 5
@@ -133,7 +133,7 @@ num_correct = 0
 model.train()
 
 best_val_loss = float('inf')
-patience = 6
+patience = 8
 patience_counter = 0
 best_model_path = 'best_model.pt'
 
@@ -179,18 +179,18 @@ for e in range(epochs):
                   "Valid Loss: {:.4f} ;".format(current_val_loss),
                   "Valid Accuracy: {:.4f}".format(valid_acc))
             # Ранняя остановка
-            if current_val_loss < best_val_loss:
-                best_val_loss = current_val_loss
-                patience_counter = 0
-                torch.save(model.state_dict(), best_model_path)
-            else:
-                patience_counter += 1
-                if patience_counter >= patience:
-                    print("Ранняя остановка: нет улучшений в валидационных потерях")
-                    break
-
-        if patience_counter >= patience:
-            break
+        #     if current_val_loss < best_val_loss:
+        #         best_val_loss = current_val_loss
+        #         patience_counter = 0
+        #         torch.save(model.state_dict(), best_model_path)
+        #     else:
+        #         patience_counter += 1
+        #         if patience_counter >= patience:
+        #             print("Ранняя остановка: нет улучшений в валидационных потерях")
+        #             break
+        #
+        # if patience_counter >= patience:
+        #     break
 
 def tokenize_text(test_review):
     test_review = test_review.lower()
@@ -206,7 +206,7 @@ def tokenize_text(test_review):
     test_ints.append([vocab_to_int[word] for word in new_text])
     return test_ints
 
-def predict(model, test_review, sequence_length=30):
+def predict(model, test_review, sequence_length=25):
     model.eval()
     test_ints = tokenize_text(test_review)
     seq_length=sequence_length
